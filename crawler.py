@@ -51,20 +51,15 @@ SCOPES = [
 
 
 def get_gsheet():
-    """Google Sheets 첫 번째 시트 반환"""
     creds_json = os.environ.get("GOOGLE_CREDENTIALS")
     spreadsheet_id = os.environ.get("SPREADSHEET_ID")
 
     if not creds_json or not spreadsheet_id:
-        raise ValueError(
-            "환경변수 GOOGLE_CREDENTIALS 또는 SPREADSHEET_ID가 설정되지 않았습니다.\n"
-            "GitHub Secrets에 등록되어 있는지 확인해주세요."
-        )
+        raise ValueError("환경변수 GOOGLE_CREDENTIALS 또는 SPREADSHEET_ID가 설정되지 않았습니다.")
 
     creds_info = json.loads(creds_json)
     creds = Credentials.from_service_account_info(creds_info, scopes=SCOPES)
     client = gspread.authorize(creds)
-
     spreadsheet = client.open_by_key(spreadsheet_id)
     sheet = spreadsheet.get_worksheet(0)
     print(f"📊 연결된 시트: '{sheet.title}'")
@@ -72,7 +67,6 @@ def get_gsheet():
 
 
 def ensure_header(sheet):
-    """헤더가 없으면 첫 행에 추가"""
     headers = ["번호", "별점", "리뷰내용", "작성일", "옵션", "작성자", "수집일시"]
     first_row = sheet.row_values(1)
     if first_row != headers:
@@ -81,7 +75,6 @@ def ensure_header(sheet):
 
 
 def get_next_row_and_num(sheet):
-    """다음 빈 행 번호와 리뷰 순번 반환"""
     all_values = sheet.get_all_values()
     next_row = len(all_values) + 1
     review_count = max(0, len(all_values) - 1)
@@ -89,13 +82,14 @@ def get_next_row_and_num(sheet):
 
 
 def setup_driver() -> webdriver.Chrome:
-    """크롬 드라이버 설정"""
     options = Options()
     options.add_argument("--headless=new")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--disable-blink-features=AutomationControlled")
     options.add_argument("--window-size=1920,1080")
+    options.add_argument("--disable-gpu")
+    options.add_argument("--lang=ko-KR")
     options.add_experimental_option("excludeSwitches", ["enable-automation"])
     options.add_experimental_option("useAutomationExtension", False)
     options.add_argument(
@@ -105,21 +99,29 @@ def setup_driver() -> webdriver.Chrome:
     )
     service = Service(ChromeDriverManager().install())
     driver = webdriver.Chrome(service=service, options=options)
-    driver.execute_script(
-        "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
-    )
+    driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
+        "source": "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
+    })
     return driver
 
 
-def click_element(driver, xpath: str, timeout: int = 10, description: str = ""):
-    """XPath로 요소 찾아서 클릭"""
+def wait_for_page_load(driver, timeout=30):
+    """페이지 완전 로딩 대기"""
+    WebDriverWait(driver, timeout).until(
+        lambda d: d.execute_script("return document.readyState") == "complete"
+    )
+    # JS 렌더링 추가 대기
+    time.sleep(5)
+
+
+def click_element(driver, xpath: str, timeout: int = 20, description: str = ""):
     try:
         el = WebDriverWait(driver, timeout).until(
-            EC.element_to_be_clickable((By.XPATH, xpath))
+            EC.presence_of_element_located((By.XPATH, xpath))
         )
         driver.execute_script("arguments[0].scrollIntoView({block:'center'});", el)
-        time.sleep(0.3)
-        el.click()
+        time.sleep(0.5)
+        driver.execute_script("arguments[0].click();", el)  # JS 클릭으로 변경
         if description:
             print(f"  ✅ {description} 클릭 완료")
         return True
@@ -130,11 +132,10 @@ def click_element(driver, xpath: str, timeout: int = 10, description: str = ""):
 
 
 def open_review_popup(driver) -> bool:
-    """리뷰 전체보기 팝업 열기 → 최신순 정렬"""
     print("📋 리뷰 팝업 열기...")
     if not click_element(driver, XPATH["review_popup_btn"], timeout=20, description="리뷰 전체보기"):
         return False
-    time.sleep(2)
+    time.sleep(3)
 
     print("🔃 최신순 정렬 중...")
     if not click_element(driver, XPATH["sort_latest"], timeout=20, description="최신순 정렬"):
@@ -144,7 +145,6 @@ def open_review_popup(driver) -> bool:
 
 
 def get_text_safe(el, xpath: str) -> str:
-    """하위 요소 텍스트 안전하게 추출"""
     try:
         found = el.find_elements(By.XPATH, xpath)
         if found:
@@ -155,13 +155,11 @@ def get_text_safe(el, xpath: str) -> str:
 
 
 def parse_star(star_text: str) -> str:
-    """별점 텍스트에서 숫자 추출"""
     match = re.search(r"[\d.]+", star_text)
     return match.group() if match else star_text
 
 
 def collect_reviews(driver) -> list[dict]:
-    """무한 스크롤로 전체 리뷰 수집"""
     all_reviews = {}
     last_count = 0
     no_new_streak = 0
@@ -185,10 +183,10 @@ def collect_reviews(driver) -> list[dict]:
 
                 if content:
                     all_reviews[item_id] = {
-                        "별점":   star,
+                        "별점":    star,
                         "리뷰내용": content,
                         "작성일":  date,
-                        "옵션":   option,
+                        "옵션":    option,
                         "작성자":  author,
                     }
             except Exception:
@@ -217,7 +215,6 @@ def collect_reviews(driver) -> list[dict]:
 
 
 def save_to_sheet(sheet, reviews: list[dict]):
-    """리뷰 데이터를 구글 시트에 이어서 추가"""
     ensure_header(sheet)
     next_row, review_count = get_next_row_and_num(sheet)
     collected_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -254,16 +251,20 @@ def main():
     try:
         print(f"\n🔗 접속 중: {PRODUCT_URL}")
         driver.get(PRODUCT_URL)
-        time.sleep(6)
 
-        # ─── 디버깅: 버튼 목록 출력 ───
+        # 페이지 완전 로딩 대기
+        wait_for_page_load(driver)
+
+        # ─── 디버깅 ───
+        print(f"📄 현재 URL: {driver.current_url}")
+        print(f"📄 페이지 타이틀: {driver.title}")
         buttons = driver.find_elements(By.TAG_NAME, "button")
         print(f"🔍 버튼 총 {len(buttons)}개 발견")
-        for btn in buttons:
+        for btn in buttons[:20]:  # 최대 20개만 출력
             txt = btn.text.strip()
             if txt:
                 print(f"  - '{txt}'")
-        # ─────────────────────────────
+        # ─────────────
 
         if not open_review_popup(driver):
             print("❌ 팝업 열기 실패 → 종료")
