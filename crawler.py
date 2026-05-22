@@ -26,7 +26,7 @@ from google.oauth2.service_account import Credentials
 PRODUCT_URL = "https://smartstore.naver.com/YOUR_STORE/products/YOUR_PRODUCT_ID"
 
 # ✅ 최대 수집 개수 (None = 전체 수집 / 테스트시 100 권장)
-MAX_REVIEWS = None
+MAX_REVIEWS = 50
 
 # ✅ 스크롤 대기 시간 (초) - 느린 환경이면 2~3으로 늘리세요
 SCROLL_WAIT = 1.5
