@@ -133,7 +133,7 @@ def click_element(driver, xpath: str, timeout: int = 10, description: str = ""):
 def open_review_popup(driver) -> bool:
     """리뷰 전체보기 팝업 열기 → 최신순 정렬"""
     print("📋 리뷰 팝업 열기...")
-    if not click_element(driver, XPATH["review_popup_btn"], description="리뷰 전체보기"):
+    if not click_element(driver, XPATH["review_popup_btn"], XPATH["review_popup_btn"], description="리뷰 전체보기"):
         return False
     time.sleep(2)
 
@@ -258,7 +258,7 @@ def main():
     try:
         print(f"\n🔗 접속 중: {PRODUCT_URL}")
         driver.get(PRODUCT_URL)
-        time.sleep(3)
+        time.sleep(6)
 
         if not open_review_popup(driver):
             print("❌ 팝업 열기 실패 → 종료")
