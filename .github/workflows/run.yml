@@ -1,0 +1,29 @@
+name: 스마트스토어 리뷰 수집
+ 
+on:
+  workflow_dispatch:  # 깃헙에서 수동 실행 버튼
+ 
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+ 
+    steps:
+      - name: 코드 체크아웃
+        uses: actions/checkout@v4
+ 
+      - name: Python 설정
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+ 
+      - name: Chrome 설치
+        uses: browser-actions/setup-chrome@v1
+ 
+      - name: 패키지 설치
+        run: pip install -r requirements.txt
+ 
+      - name: 리뷰 수집 실행
+        env:
+          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+          SPREADSHEET_ID: ${{ secrets.SPREADSHEET_ID }}
+        run: python crawler.py
