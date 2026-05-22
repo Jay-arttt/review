@@ -84,7 +84,6 @@ def get_next_row_and_num(sheet):
     """다음 빈 행 번호와 리뷰 순번 반환"""
     all_values = sheet.get_all_values()
     next_row = len(all_values) + 1
-    # 헤더 제외한 데이터 행 수 = 현재까지 수집된 리뷰 수
     review_count = max(0, len(all_values) - 1)
     return next_row, review_count
 
@@ -133,12 +132,12 @@ def click_element(driver, xpath: str, timeout: int = 10, description: str = ""):
 def open_review_popup(driver) -> bool:
     """리뷰 전체보기 팝업 열기 → 최신순 정렬"""
     print("📋 리뷰 팝업 열기...")
-    if not click_element(driver, XPATH["review_popup_btn"], XPATH["review_popup_btn"], description="리뷰 전체보기"):
+    if not click_element(driver, XPATH["review_popup_btn"], timeout=20, description="리뷰 전체보기"):
         return False
     time.sleep(2)
 
     print("🔃 최신순 정렬 중...")
-    if not click_element(driver, XPATH["sort_latest"], description="최신순 정렬"):
+    if not click_element(driver, XPATH["sort_latest"], timeout=20, description="최신순 정렬"):
         return False
     time.sleep(2)
     return True
@@ -235,7 +234,6 @@ def save_to_sheet(sheet, reviews: list[dict]):
             collected_at,
         ])
 
-    # 한 번에 업로드 (API 호출 최소화)
     sheet.append_rows(rows, value_input_option="USER_ENTERED")
     print(f"📊 구글 시트 '{sheet.title}'에 {len(rows)}개 추가 완료 (총 {review_count + len(rows)}개)")
 
@@ -249,11 +247,9 @@ def main():
         print("\n❌ PRODUCT_URL을 실제 상품 URL로 변경해주세요!")
         return
 
-    # 구글 시트 연결
     print("\n🔑 Google Sheets 연결 중...")
     sheet = get_gsheet()
 
-    # 크롤링
     driver = setup_driver()
     try:
         print(f"\n🔗 접속 중: {PRODUCT_URL}")
@@ -268,7 +264,6 @@ def main():
     finally:
         driver.quit()
 
-    # 저장
     if reviews:
         save_to_sheet(sheet, reviews)
         print(f"\n✅ 완료! 총 {len(reviews)}개 리뷰 수집 → 구글 시트 저장 완료")
