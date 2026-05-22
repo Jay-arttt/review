@@ -23,7 +23,7 @@ from google.oauth2.service_account import Credentials
 
 # ─────────────────────────────────────────────
 # ✅ 수집할 상품 URL
-PRODUCT_URL = "https://smartstore.naver.com/YOUR_STORE/products/YOUR_PRODUCT_ID"
+PRODUCT_URL = "https://brand.naver.com/minoxell/products/12538178823"
 
 # ✅ 최대 수집 개수 (None = 전체 수집 / 테스트시 100 권장)
 MAX_REVIEWS = 50
