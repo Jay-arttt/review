@@ -66,7 +66,7 @@ def get_gsheet():
     client = gspread.authorize(creds)
 
     spreadsheet = client.open_by_key(spreadsheet_id)
-    sheet = spreadsheet.get_worksheet(0)  # 첫 번째 시트 자동 선택
+    sheet = spreadsheet.get_worksheet(0)
     print(f"📊 연결된 시트: '{sheet.title}'")
     return sheet
 
@@ -255,6 +255,15 @@ def main():
         print(f"\n🔗 접속 중: {PRODUCT_URL}")
         driver.get(PRODUCT_URL)
         time.sleep(6)
+
+        # ─── 디버깅: 버튼 목록 출력 ───
+        buttons = driver.find_elements(By.TAG_NAME, "button")
+        print(f"🔍 버튼 총 {len(buttons)}개 발견")
+        for btn in buttons:
+            txt = btn.text.strip()
+            if txt:
+                print(f"  - '{txt}'")
+        # ─────────────────────────────
 
         if not open_review_popup(driver):
             print("❌ 팝업 열기 실패 → 종료")
